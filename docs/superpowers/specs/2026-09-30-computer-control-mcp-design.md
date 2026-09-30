@@ -177,4 +177,5 @@ Real GUI automation resists full unit testing. Split:
   (it had to be killed). `click` now waits 30ms after each event;
   `drag` waits 100ms after the down, 20ms per step, and 100ms before
   the up.
-- GUI checks stay manual (scripts/smoke-test.md).
+- CI (GitHub Actions, macOS) runs unit tests and the build. GUI checks
+  stay manual (scripts/smoke-test.md).
