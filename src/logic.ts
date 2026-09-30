@@ -92,6 +92,15 @@ export function findElement(nodes: Node[], label?: string, role?: string): Node 
   throw new Error(`${hits.length} elements match ${what}; pass one id instead:\n${list}`);
 }
 
+// inspect(find): elements whose role equals the query or whose label
+// contains it, flattened (depth 0) so the output is just the hits.
+export function filterNodes(nodes: Node[], query: string): Node[] {
+  const q = query.toLowerCase();
+  return nodes
+    .filter((n) => n.role.toLowerCase() === q || [n.name, n.desc, n.value].some((l) => l?.toLowerCase().includes(q)))
+    .map((n) => ({ ...n, depth: 0 }));
+}
+
 export function parseId(id: string): number[] {
   if (!/^\d+(\.\d+)*$/.test(id)) throw new Error(`Bad element id "${id}". Use an id from inspect, e.g. "1.3.2".`);
   return id.split('.').map(Number);

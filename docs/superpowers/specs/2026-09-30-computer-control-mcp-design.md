@@ -191,3 +191,21 @@ Real GUI automation resists full unit testing. Split:
   the call is unavailable.
 - `screenshot` verified live: a 2048-point main display gives a 2048px
   image.
+
+## v0.3 notes
+
+- `inspect` fetches one tree *level* per Apple Event. An attribute read on a
+  chained specifier (`windows.uiElements.uiElements…`) returns that
+  attribute for every element at that depth, nested by parent. That is 6
+  events per level instead of 6 per parent: TextEdit went from 6.0s to
+  1.5s, Finder from 13.9s to 3.5s. `click_element` and `set_value` with a
+  label speed up too, since they reuse it.
+- Ids now start at `proc.windows` (the menu bar is `menu()`'s job), and
+  `actOn` resolves ids the same way.
+- `inspect(find)` filters to matching elements across the whole tree.
+- `screenshot(app)` captures the app's front window with
+  `screencapture -l <CGWindowID>`, found via `CGWindowListCopyWindowInfo`.
+  This works when the window is covered. Under Stage Manager, a background
+  window is a side-strip thumbnail: CoreGraphics reports the thumbnail
+  bounds while accessibility reports the real size, and the tool warns
+  when those differ.
