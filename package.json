@@ -1,0 +1,32 @@
+{
+  "name": "claude-background-control",
+  "version": "0.1.0",
+  "description": "MCP server giving Claude Code real macOS GUI control (click/type/inspect)",
+  "type": "module",
+  "bin": {
+    "claude-background-control": "dist/server.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "os": [
+    "darwin"
+  ],
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test src/*.test.ts",
+    "prepublishOnly": "npm test && npm run build"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/server": "^2.2.0",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.3",
+    "typescript": "^7.0.2"
+  }
+}
