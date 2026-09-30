@@ -124,3 +124,14 @@ export function permissionHelp(kind: 'ax' | 'screen', exe: string | null, fallba
   return `${what} permission is missing. macOS charges it to "${name}":\n  ${app}\n` +
     `Open ${pane} and enable it.${add} Then fully quit and reopen the app running Claude Code.`;
 }
+
+// Calls check() until it returns a value, or throws after timeoutMs.
+export async function pollUntil<T>(check: () => Promise<T | null>, timeoutMs: number, intervalMs = 500): Promise<T> {
+  const end = Date.now() + timeoutMs;
+  for (;;) {
+    const r = await check();
+    if (r !== null) return r;
+    if (Date.now() + intervalMs > end) throw new Error(`Timed out after ${timeoutMs / 1000}s.`);
+    await new Promise((res) => setTimeout(res, intervalMs));
+  }
+}

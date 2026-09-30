@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkPoint, filterNodes, findElement, formatTree, parseCombo, parseId, permissionHelp, type Node } from './logic.ts';
+import { checkPoint, filterNodes, pollUntil, findElement, formatTree, parseCombo, parseId, permissionHelp, type Node } from './logic.ts';
 
 test('parseCombo', () => {
   assert.deepEqual(parseCombo('return'), { code: 36, mods: [] });
@@ -71,4 +71,11 @@ test('filterNodes', () => {
   assert.deepEqual(filterNodes(nodes, 'sav').map((n) => n.id), ['1.1', '1.2', '1.4']); // label substring
   assert.deepEqual(filterNodes(nodes, 'search').map((n) => [n.id, n.depth]), [['1.3', 0]]); // flattened
   assert.deepEqual(filterNodes(nodes, 'zzz'), []);
+});
+
+test('pollUntil', async () => {
+  let n = 0;
+  assert.equal(await pollUntil(async () => (++n >= 3 ? 'ok' : null), 1000, 10), 'ok');
+  assert.equal(n, 3);
+  await assert.rejects(pollUntil(async () => null, 50, 10), /Timed out after 0\.05s/);
 });

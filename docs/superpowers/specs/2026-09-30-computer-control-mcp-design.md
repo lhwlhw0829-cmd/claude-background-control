@@ -209,3 +209,14 @@ Real GUI automation resists full unit testing. Split:
   window is a side-strip thumbnail: CoreGraphics reports the thumbnail
   bounds while accessibility reports the real size, and the tool warns
   when those differ.
+
+## v0.4 notes
+
+- `type` saves every clipboard item and type through NSPasteboard and
+  restores them afterwards. Before, only text survived, so a copied image
+  or file was lost. If something else writes to the clipboard during the
+  paste (the changeCount moves), the restore is skipped so that newer
+  content isn't overwritten.
+- `wait_for(find, gone?, timeout?)` polls `inspect` + `filterNodes` every
+  500ms (`pollUntil` in logic.ts, unit-tested).
+- `key(repeat)` presses a key several times with 30ms gaps.
