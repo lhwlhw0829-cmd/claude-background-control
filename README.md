@@ -43,8 +43,9 @@ version number, a Claude Code update can require granting it again.
 | `inspect(app?, find?)` | Lists UI elements of the app's windows with an id, role, label, value, and frame. Start here. `find` returns only matching elements (by role or label). |
 | `click_element(id \| label \| role, app?)` | Presses a button or focuses a field via accessibility, with no mouse movement. Falls back to a real click. |
 | `set_value(id \| label \| role, value, app?)` | Sets a text field's value directly. Works in background apps and with any language. |
-| `type(text)` | Types into the focused field by pasting, so Korean and other IME input comes through correctly. |
-| `key(combo)` | Sends key codes like `cmd+s` or `return`, so shortcuts work even when a Korean input source is active. |
+| `type(text)` | Types into the focused field by pasting, so Korean and other IME input comes through correctly. The whole clipboard (images, files, rich text) is restored afterwards. |
+| `key(combo, repeat?)` | Sends key codes like `cmd+s` or `return`, so shortcuts work even when a Korean input source is active. |
+| `wait_for(find, app?, gone?, timeout?)` | Waits until a matching element appears, or disappears with `gone`. Use after actions that open dialogs or load content. |
 | `click(x, y, button?, clicks?)` | Real mouse click (CoreGraphics) for canvas or Electron content. |
 | `menu(path?, app?)` | Walks the menu bar by item names, e.g. `["File", "Save…"]`. A path that ends on a menu lists its items; one that ends on an item clicks it. Works on background apps. |
 | `scroll(direction, amount?, x?, y?)` | Mouse-wheel scroll by lines, at a point or wherever the cursor is. |
@@ -74,6 +75,5 @@ After changing `src/mac.ts`, run the manual GUI checklist in
 - `inspect` doesn't descend into leaf-like roles such as buttons and static text.
 - With Stage Manager on, a background app's window is only a side-strip
   thumbnail, so `screenshot(app)` warns and suggests `activate_app` first.
-- `type` restores the clipboard only if it held text.
 
 Design notes: [docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md](docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md)

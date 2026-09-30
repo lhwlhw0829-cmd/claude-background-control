@@ -127,21 +127,41 @@ export const menu = (app: string | undefined, path: string[]) =>
     return { trail, clicked: false, items: names.map((name, i) => ({ name, enabled: enabled[i] })) };
   }`, { app, path });
 
-export const keyCode = (code: number, mods: string[]) =>
-  jxa<void>(`(a) => { Application('System Events').keyCode(a.code, { using: a.mods }); }`, { code, mods });
-
 // Types via clipboard paste: keystroke() mangles Hangul/IME input and even
-// types ASCII as Hangul when a Korean input source is active.
-// ponytail: restores only a text clipboard; images/files on it are lost.
+// types ASCII as Hangul when a Korean input source is active. Every item and
+// type on the clipboard (images, files, rich text) is saved and put back,
+// unless something else wrote to the clipboard in the meantime.
 export const typeText = (text: string) =>
-  jxa<void>(`(a) => {
-    const app = Application.currentApplication(); app.includeStandardAdditions = true;
-    let prev = null; try { prev = app.theClipboard(); } catch (e) {}
-    app.setTheClipboardTo(a.text);
+  jxa<{ restored: boolean }>(`(a) => {
+    ObjC.import('AppKit');
+    const pb = $.NSPasteboard.generalPasteboard;
+    const saved = [];
+    const items = pb.pasteboardItems;
+    for (let i = 0; i < items.count; i++) {
+      const item = items.objectAtIndex(i), types = item.types, copy = $.NSPasteboardItem.alloc.init;
+      for (let j = 0; j < types.count; j++) {
+        const t = types.objectAtIndex(j), d = item.dataForType(t);
+        if (!d.isNil()) copy.setDataForType(d, t);
+      }
+      saved.push(copy);
+    }
+    pb.clearContents;
+    pb.setStringForType($(a.text), $.NSPasteboardTypeString);
+    const ours = pb.changeCount;
     Application('System Events').keyCode(9, { using: ['command down'] });
     delay(0.3); // paste reads the clipboard asynchronously
-    if (typeof prev === 'string') app.setTheClipboardTo(prev);
+    if (pb.changeCount !== ours) return { restored: false }; // someone copied meanwhile: keep theirs
+    pb.clearContents;
+    if (saved.length) pb.writeObjects($(saved));
+    return { restored: true };
   }`, { text });
+
+// Presses a key code `times` times, pausing so apps see separate presses.
+export const keyCode = (code: number, mods: string[], times = 1) =>
+  jxa<void>(`(a) => {
+    const se = Application('System Events');
+    for (let i = 0; i < a.times; i++) { se.keyCode(a.code, { using: a.mods }); if (i < a.times - 1) delay(0.03); }
+  }`, { code, mods, times });
 
 // Fetches the accessibility tree one *level* at a time: an attribute read on
 // a chained specifier (windows.uiElements.uiElements…) returns that attribute

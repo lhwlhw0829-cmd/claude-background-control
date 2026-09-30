@@ -2,7 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
-import { checkPoint, filterNodes, findElement, formatTree, parseCombo, parseId, permissionHelp } from './logic.ts';
+import { checkPoint, filterNodes, pollUntil, findElement, formatTree, parseCombo, parseId, permissionHelp } from './logic.ts';
 import * as mac from './mac.ts';
 
 const fallbackHost = process.env.TERM_PROGRAM ?? 'the app that runs Claude Code (Terminal, iTerm, Claude, …)';
@@ -45,7 +45,7 @@ async function resolve(a: { id?: string; label?: string; role?: string; app?: st
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'claude-background-control', version: '0.3.0' });
+  const server = new McpServer({ name: 'claude-background-control', version: '0.4.0' });
 
   server.registerTool('screenshot', {
     description: 'Capture as PNG: the main screen, a region (x, y, w, h), or one app\'s front window (app), even if other windows cover it. Image pixels equal screen points; for a window, add the reported origin to get screen coordinates for click.',
@@ -165,22 +165,43 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('type', {
-    description: 'Type text into the focused element of the frontmost app (via paste, so Korean and other IME text work). Prefer set_value for plain text fields.',
+    description: 'Type text into the focused element of the frontmost app (via paste, so Korean and other IME text work; the clipboard, images included, is restored). Prefer set_value for plain text fields.',
     inputSchema: z.object({ text: z.string().min(1) }),
   }, tool(async (a) => {
     await need('ax');
-    await mac.typeText(a.text);
-    return text(`Typed ${a.text.length} characters.`);
+    const { restored } = await mac.typeText(a.text);
+    return text(`Typed ${a.text.length} characters.${restored ? '' : ' The clipboard changed during typing, so it was left as is.'}`);
   }));
 
   server.registerTool('key', {
-    description: 'Press a key or combo in the frontmost app, e.g. "return", "cmd+s", "cmd+shift+t", "esc", "down".',
-    inputSchema: z.object({ combo: z.string() }),
-  }, tool(async ({ combo }) => {
+    description: 'Press a key or combo in the frontmost app, e.g. "return", "cmd+s", "cmd+shift+t", "esc", "down". repeat presses it several times.',
+    inputSchema: z.object({ combo: z.string(), repeat: z.number().int().min(1).max(50).default(1) }),
+  }, tool(async ({ combo, repeat }) => {
     const { code, mods } = parseCombo(combo);
     await need('ax');
-    await mac.keyCode(code, mods);
-    return text(`Pressed ${combo}.`);
+    await mac.keyCode(code, mods, repeat);
+    return text(`Pressed ${combo}${repeat > 1 ? ` x${repeat}` : ''}.`);
+  }));
+
+  server.registerTool('wait_for', {
+    description: 'Wait until an element matching find (role or label, like inspect find) appears in the app, or disappears with gone=true. Use after actions that open dialogs, load pages, or show spinners.',
+    inputSchema: z.object({
+      find: z.string(),
+      app: target.app,
+      gone: z.boolean().default(false),
+      timeout: z.number().min(1).max(120).default(10).describe('Seconds'),
+    }),
+  }, tool(async ({ find, app, gone, timeout }) => {
+    await need('ax');
+    const start = Date.now();
+    const r = await pollUntil(async () => {
+      const t = await mac.inspect(app, 10, 3000);
+      const hits = filterNodes(t.nodes, find);
+      return (hits.length > 0) !== gone ? { app: t.app, hits } : null;
+    }, timeout * 1000).catch((e) => { throw new Error(`"${find}" ${gone ? 'is still there' : 'did not appear'}. ${e.message}`); });
+    const secs = ((Date.now() - start) / 1000).toFixed(1);
+    if (gone) return text(`"${find}" is gone (${secs}s).`);
+    return text(`Found after ${secs}s:\n${formatTree(r.app, r.hits.slice(0, 20), r.hits.length > 20)}`);
   }));
 
   server.registerTool('activate_app', {

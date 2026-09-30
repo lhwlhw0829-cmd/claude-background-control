@@ -11,6 +11,9 @@ Recording permission (see README).
    - [ ] `inspect(app: "TextEdit")` lists an `AXTextArea`.
    - [ ] `set_value(role: "AXTextArea", app: "TextEdit", value: "안녕 hello")`:
          the text appears in TextEdit while your mouse and focus stay put.
+   - [ ] Copy an image, then `type("x")`: the image is still on the clipboard afterwards.
+   - [ ] `wait_for(app: "TextEdit", find: "AXSheet")`, then press cmd+w on an edited document: it
+         reports the save sheet. After esc, `wait_for(..., gone: true)` reports it gone.
    - [ ] `click_element(label: "중앙 정렬", app: "TextEdit")` (or "Center" in English):
          alignment flips in the background; a fresh `inspect` shows its value = "1".
    - [ ] `activate_app("TextEdit")`, then `key("cmd+a")` and `type("한글 입력 테스트")`:
