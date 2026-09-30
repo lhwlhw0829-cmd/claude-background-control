@@ -41,6 +41,9 @@ If a permission is missing, the tool tells you exactly which one.
 | `type(text)` | Types into the focused field by pasting, so Korean and other IME input comes through correctly. |
 | `key(combo)` | Sends key codes like `cmd+s` or `return`, so shortcuts work even when a Korean input source is active. |
 | `click(x, y, button?, clicks?)` | Real mouse click (CoreGraphics) for canvas or Electron content. |
+| `menu(path?, app?)` | Walks the menu bar by item names, e.g. `["File", "Save…"]`. A path that ends on a menu lists its items; one that ends on an item clicks it. Works on background apps. |
+| `scroll(direction, amount?, x?, y?)` | Mouse-wheel scroll by lines, at a point or wherever the cursor is. |
+| `drag(x1, y1, x2, y2)` | Left-button drag: select text, move things, resize. |
 | `screenshot(x?, y?, w?, h?)` | PNG of the main screen. Image pixels equal screen points, so `click` can use coordinates from it as-is. |
 | `activate_app(name)` | Launches an app or brings it to the front. |
 
@@ -60,11 +63,10 @@ npm run build
 After changing `src/mac.ts`, run the manual GUI checklist in
 [scripts/smoke-test.md](scripts/smoke-test.md).
 
-## Limits (v0.1)
+## Limits
 
 - Main display only.
-- The menu bar's contents aren't inspected; use `key` shortcuts for menus.
+- `inspect` doesn't descend into leaf-like roles such as buttons and static text.
 - `type` restores the clipboard only if it held text.
-- No drag or scroll yet.
 
 Design notes: [docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md](docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md)

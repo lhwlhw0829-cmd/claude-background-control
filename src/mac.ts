@@ -59,8 +59,56 @@ export const click = (x: number, y: number, button: 'left' | 'right', clicks: nu
       const e = $.CGEventCreateMouseEvent(null, t, p, btn);
       $.CGEventSetIntegerValueField(e, 1, i); // kCGMouseEventClickState: 2 = double-click
       $.CGEventPost(0, e);
+      delay(0.03); // AppKit drops multi-clicks that arrive faster than its event loop
     }
   }`, { x, y, button, clicks });
+
+// Scroll wheel by lines at (x, y), or wherever the cursor is.
+// dy > 0 scrolls up, dx > 0 scrolls left (CGEvent convention).
+export const scroll = (dy: number, dx: number, at?: { x: number; y: number }) =>
+  jxa<void>(`(a) => {
+    ObjC.import('CoreGraphics');
+    if (a.at) $.CGEventPost(0, $.CGEventCreateMouseEvent(null, 5, $.CGPointMake(a.at.x, a.at.y), 0));
+    $.CGEventPost(0, $.CGEventCreateScrollWheelEvent(null, 1, 2, a.dy, a.dx)); // 1 = line units, 2 wheels
+  }`, { dy, dx, at });
+
+// Left-button drag in small steps so apps see a continuous motion.
+export const drag = (x1: number, y1: number, x2: number, y2: number) =>
+  jxa<void>(`(a) => {
+    ObjC.import('CoreGraphics');
+    const post = (type, x, y) => $.CGEventPost(0, $.CGEventCreateMouseEvent(null, type, $.CGPointMake(x, y), 0));
+    // Pauses let the app enter and follow its mouse-tracking loop; without
+    // them the down/up pair reads as a plain click.
+    post(5, a.x1, a.y1); post(1, a.x1, a.y1); delay(0.1); // move, down
+    for (let i = 1; i <= 20; i++) { post(6, a.x1 + (a.x2 - a.x1) * i / 20, a.y1 + (a.y2 - a.y1) * i / 20); delay(0.02); } // dragged
+    delay(0.1); post(2, a.x2, a.y2); // up
+  }`, { x1, y1, x2, y2 });
+
+// Walks the menu bar by item names. Ends on a menu → lists its items;
+// ends on a plain item → clicks it. Works on background apps.
+export const menu = (app: string | undefined, path: string[]) =>
+  jxa<{ trail: string[]; clicked: boolean; items: { name: string | null; enabled: boolean }[] }>(`(a) => {
+    ${PROC}
+    const norm = (s) => s.toLowerCase().replace(/\\.\\.\\./g, '…').trim(); // "Save..." matches "Save…"
+    let items = proc.menuBars[0].menuBarItems;
+    const trail = [];
+    for (let step = 0; step < a.path.length; step++) {
+      const names = items.name();
+      const i = names.findIndex((n) => n && norm(n) === norm(a.path[step]));
+      if (i < 0) throw new Error('No menu item "' + a.path[step] + '" in ' + (trail.join(' > ') || 'the menu bar') + '. Available: ' + names.filter(Boolean).join(', '));
+      const item = items[i];
+      trail.push(names[i]);
+      if (item.menus.length === 0) {
+        if (step < a.path.length - 1) throw new Error('"' + trail.join(' > ') + '" has no submenu');
+        if (!item.enabled()) throw new Error('"' + trail.join(' > ') + '" is disabled right now');
+        item.click();
+        return { trail, clicked: true, items: [] };
+      }
+      items = item.menus[0].menuItems;
+    }
+    const names = items.name(), enabled = items.enabled();
+    return { trail, clicked: false, items: names.map((name, i) => ({ name, enabled: enabled[i] })) };
+  }`, { app, path });
 
 export const keyCode = (code: number, mods: string[]) =>
   jxa<void>(`(a) => { Application('System Events').keyCode(a.code, { using: a.mods }); }`, { code, mods });
@@ -80,7 +128,7 @@ export const typeText = (text: string) =>
 
 // Walks the accessibility tree, fetching each attribute for a whole sibling
 // list in one Apple Event (per-element fetches are ~100x slower).
-// ponytail: skips the menu bar's contents; use key() shortcuts for menus.
+// Skips the menu bar's contents: menu() browses those on demand.
 export const inspect = (app: string | undefined, maxDepth: number, maxNodes: number) =>
   jxa<{ app: string; nodes: Node[]; truncated: boolean }>(`(a) => {
     ${PROC}

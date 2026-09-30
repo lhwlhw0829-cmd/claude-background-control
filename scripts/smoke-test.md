@@ -17,5 +17,10 @@ Recording permission (see README).
          the document now reads exactly `한글 입력 테스트`, even with the Korean input source on.
    - [ ] `screenshot()`: a sharp image of the screen, not just the wallpaper.
    - [ ] `click` on a point taken from that screenshot lands on that spot.
+   - [ ] `menu(app: "TextEdit", path: ["File"])` lists items; `path: ["File", "New"]` opens a new
+         document while TextEdit stays in the background.
+   - [ ] Double-click a word → it gets selected. `drag` across a line → the text is selected,
+         and TextEdit still responds afterwards (a lost mouse-up leaves it stuck in mouse tracking).
+   - [ ] In a long document, `scroll(direction: "down", amount: 20)` over the text moves it.
    - [ ] `click(x: 99999, y: 0)` returns an "outside the main screen" error.
 4. `claude mcp remove cbc-dev`
