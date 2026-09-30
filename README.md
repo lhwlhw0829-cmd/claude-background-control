@@ -16,7 +16,7 @@ keyboard events are only the fallback.
 claude mcp add computer-control -- npx -y claude-background-control
 ```
 
-Requires macOS and Node 22.18+.
+Requires macOS and Node 20+ (development needs 22.18+ to run the TypeScript tests directly).
 
 ## Permissions (first run)
 

@@ -2,6 +2,22 @@
   "name": "claude-background-control",
   "version": "0.2.0",
   "description": "MCP server giving Claude Code real macOS GUI control (click/type/inspect)",
+  "keywords": [
+    "mcp",
+    "mcp-server",
+    "claude",
+    "claude-code",
+    "macos",
+    "accessibility",
+    "automation",
+    "gui"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lhwlhw0829-cmd/claude-background-control.git"
+  },
+  "homepage": "https://github.com/lhwlhw0829-cmd/claude-background-control#readme",
+  "license": "MIT",
   "type": "module",
   "bin": {
     "claude-background-control": "dist/server.js"
@@ -13,14 +29,13 @@
     "darwin"
   ],
   "engines": {
-    "node": ">=22.18"
+    "node": ">=20"
   },
   "scripts": {
     "build": "tsc",
     "test": "node --test src/*.test.ts",
     "prepublishOnly": "npm test && npm run build"
   },
-  "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/server": "^2.2.0",
     "zod": "^4.6.5"
