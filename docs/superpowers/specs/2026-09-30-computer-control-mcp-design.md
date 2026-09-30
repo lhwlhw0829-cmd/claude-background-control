@@ -142,3 +142,26 @@ Real GUI automation resists full unit testing. Split:
 - Windows/Linux backends.
 - Drag/scroll/multi-touch gestures.
 - Automated (non-manual) end-to-end GUI test harness.
+
+## Implementation notes (v0.1, supersedes parts above)
+
+- Files collapsed to three: `src/server.ts` (tools, permission gate),
+  `src/mac.ts` (all osascript/screencapture/sips calls),
+  `src/logic.ts` (pure logic, unit-tested in `src/logic.test.ts`).
+- Coordinate clicks use CoreGraphics `CGEventPost` through the JXA ObjC
+  bridge instead of System Events `click at`, which only hits
+  accessibility elements and misses canvas/Electron content.
+- `click_element` tries accessibility actions first (focus for text
+  inputs, `AXPress` otherwise), so it works on background apps without
+  moving the mouse. It clicks the element's center only as a fallback.
+- Added `set_value` (direct AXValue write) and `activate_app`.
+- `type` pastes through the clipboard and restores it afterwards.
+  `keystroke` garbles Hangul, and when a Korean input source is active
+  it even turns ASCII into Hangul. `key` sends key codes for the same
+  reason.
+- `inspect` fetches each attribute once per sibling list (batched Apple
+  Events), limits depth and node count, and skips the menu bar's contents.
+- Screenshots are resampled so that 1 image pixel equals 1 screen point.
+- Screen Recording is checked via `CGPreflightScreenCaptureAccess`,
+  bound manually with `ObjC.bindFunction` because it isn't in the bridge
+  metadata.
