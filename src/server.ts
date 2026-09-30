@@ -49,7 +49,7 @@ async function resolve(a: { id?: string; label?: string; role?: string; app?: st
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'claude-background-control', version: '0.1.0' });
+  const server = new McpServer({ name: 'claude-background-control', version: '0.2.0' });
 
   server.registerTool('screenshot', {
     description: 'Capture the main screen (or a region) as PNG. Image pixels equal screen points, so coordinates read off it can be passed to click as-is.',
@@ -113,6 +113,45 @@ function createServer(): McpServer {
     checkPoint(x, y, await mac.screenSize());
     await mac.click(x, y, button, clicks);
     return text(`Clicked ${button} x${clicks} at (${x}, ${y}).`);
+  }));
+
+  server.registerTool('scroll', {
+    description: 'Scroll with the mouse wheel, at (x, y) if given, else wherever the cursor is.',
+    inputSchema: z.object({
+      direction: z.enum(['up', 'down', 'left', 'right']),
+      amount: z.number().int().min(1).max(100).default(5).describe('Lines to scroll'),
+      x: z.number().optional(), y: z.number().optional(),
+    }),
+  }, tool(async ({ direction, amount, x, y }) => {
+    if ((x === undefined) !== (y === undefined)) throw new Error('Pass both x and y, or neither.');
+    await need('ax');
+    if (x !== undefined) checkPoint(x, y!, await mac.screenSize());
+    const [dy, dx] = { up: [amount, 0], down: [-amount, 0], left: [0, amount], right: [0, -amount] }[direction];
+    await mac.scroll(dy, dx, x === undefined ? undefined : { x, y: y! });
+    return text(`Scrolled ${direction} ${amount} lines.`);
+  }));
+
+  server.registerTool('drag', {
+    description: 'Drag with the left mouse button from (x1, y1) to (x2, y2): select text, move items, resize.',
+    inputSchema: z.object({ x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }),
+  }, tool(async ({ x1, y1, x2, y2 }) => {
+    await need('ax');
+    const screen = await mac.screenSize();
+    checkPoint(x1, y1, screen);
+    checkPoint(x2, y2, screen);
+    await mac.drag(x1, y1, x2, y2);
+    return text(`Dragged (${x1}, ${y1}) → (${x2}, ${y2}).`);
+  }));
+
+  server.registerTool('menu', {
+    description: 'Use an app\'s menu bar by item names, e.g. path ["File", "Save…"]. A path ending on a menu (or empty) lists its items; ending on an item clicks it. Works on background apps. Names are localized ("..." matches "…").',
+    inputSchema: z.object({ path: z.array(z.string()).default([]), app: target.app }),
+  }, tool(async ({ path, app }) => {
+    await need('ax');
+    const r = await mac.menu(app, path);
+    if (r.clicked) return text(`Clicked ${r.trail.join(' > ')}.`);
+    const lines = r.items.map((i) => (i.name === null ? '  ───' : `  ${i.name}${i.enabled ? '' : '  (disabled)'}`));
+    return text(`${r.trail.join(' > ') || 'Menu bar'}:\n${lines.join('\n')}`);
   }));
 
   server.registerTool('type', {

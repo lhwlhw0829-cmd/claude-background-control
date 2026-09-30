@@ -165,3 +165,16 @@ Real GUI automation resists full unit testing. Split:
 - Screen Recording is checked via `CGPreflightScreenCaptureAccess`,
   bound manually with `ObjC.bindFunction` because it isn't in the bridge
   metadata.
+
+## v0.2 notes
+
+- Added `menu` (browse or click the menu bar by names; works on
+  background apps), `scroll` (line-based wheel events), and `drag`.
+- Synthetic mouse events need pauses. When the down, dragged, and up
+  events for a drag or double-click are posted back-to-back, AppKit can
+  miss the mouse-up. That left TextEdit stuck in `NSTextView mouseDown`
+  tracking, ignoring Apple Events, and later mouse-ups couldn't free it
+  (it had to be killed). `click` now waits 30ms after each event;
+  `drag` waits 100ms after the down, 20ms per step, and 100ms before
+  the up.
+- GUI checks stay manual (scripts/smoke-test.md).
