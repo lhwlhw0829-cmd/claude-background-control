@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkPoint, findElement, formatTree, parseCombo, parseId, permissionHelp, type Node } from './logic.ts';
+import { checkPoint, filterNodes, findElement, formatTree, parseCombo, parseId, permissionHelp, type Node } from './logic.ts';
 
 test('parseCombo', () => {
   assert.deepEqual(parseCombo('return'), { code: 36, mods: [] });
@@ -64,4 +64,11 @@ test('permissionHelp', () => {
   assert.doesNotMatch(term, /Cmd\+Shift\+G/); // listed apps need no manual add
   assert.match(permissionHelp('ax', '/usr/bin/sshd', 'x'), /"sshd":\n {2}\/usr\/bin\/sshd/);
   assert.equal(permissionHelp('ax', null, 'iTerm'), 'Accessibility permission is missing. Open System Settings → Privacy & Security → Accessibility, enable iTerm, then restart it.');
+});
+
+test('filterNodes', () => {
+  assert.deepEqual(filterNodes(nodes, 'axbutton').map((n) => n.id), ['1.1', '1.2']); // role, any case
+  assert.deepEqual(filterNodes(nodes, 'sav').map((n) => n.id), ['1.1', '1.2', '1.4']); // label substring
+  assert.deepEqual(filterNodes(nodes, 'search').map((n) => [n.id, n.depth]), [['1.3', 0]]); // flattened
+  assert.deepEqual(filterNodes(nodes, 'zzz'), []);
 });

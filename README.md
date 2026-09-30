@@ -40,7 +40,7 @@ version number, a Claude Code update can require granting it again.
 
 | Tool | What it does |
 |---|---|
-| `inspect(app?)` | Lists UI elements with an id, role, label, value, and frame. Start here. |
+| `inspect(app?, find?)` | Lists UI elements of the app's windows with an id, role, label, value, and frame. Start here. `find` returns only matching elements (by role or label). |
 | `click_element(id \| label \| role, app?)` | Presses a button or focuses a field via accessibility, with no mouse movement. Falls back to a real click. |
 | `set_value(id \| label \| role, value, app?)` | Sets a text field's value directly. Works in background apps and with any language. |
 | `type(text)` | Types into the focused field by pasting, so Korean and other IME input comes through correctly. |
@@ -49,7 +49,7 @@ version number, a Claude Code update can require granting it again.
 | `menu(path?, app?)` | Walks the menu bar by item names, e.g. `["File", "Save…"]`. A path that ends on a menu lists its items; one that ends on an item clicks it. Works on background apps. |
 | `scroll(direction, amount?, x?, y?)` | Mouse-wheel scroll by lines, at a point or wherever the cursor is. |
 | `drag(x1, y1, x2, y2)` | Left-button drag: select text, move things, resize. |
-| `screenshot(x?, y?, w?, h?)` | PNG of the main screen. Image pixels equal screen points, so `click` can use coordinates from it as-is. |
+| `screenshot(app? \| x, y, w, h)` | PNG of the main screen, a region, or one app's front window, even if other windows cover it. Image pixels equal screen points. For a window, add the reported origin to get click coordinates. |
 | `activate_app(name)` | Launches an app or brings it to the front. |
 
 `app` is the process name (e.g. `"TextEdit"`). If you leave it out, the
@@ -72,6 +72,8 @@ After changing `src/mac.ts`, run the manual GUI checklist in
 
 - Main display only.
 - `inspect` doesn't descend into leaf-like roles such as buttons and static text.
+- With Stage Manager on, a background app's window is only a side-strip
+  thumbnail, so `screenshot(app)` warns and suggests `activate_app` first.
 - `type` restores the clipboard only if it held text.
 
 Design notes: [docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md](docs/superpowers/specs/2026-09-30-computer-control-mcp-design.md)

@@ -16,6 +16,10 @@ Recording permission (see README).
    - [ ] `activate_app("TextEdit")`, then `key("cmd+a")` and `type("한글 입력 테스트")`:
          the document now reads exactly `한글 입력 테스트`, even with the Korean input source on.
    - [ ] `screenshot()`: a sharp image of the screen, not just the wallpaper.
+   - [ ] `screenshot(app: "TextEdit")` with another window covering TextEdit: you get the whole
+         TextEdit window. With Stage Manager on and TextEdit in the side strip, you get the thumbnail
+         warning instead.
+   - [ ] `inspect(app: "TextEdit", find: "Center")` (or "정렬") lists only the alignment controls.
    - [ ] `click` on a point taken from that screenshot lands on that spot.
    - [ ] `menu(app: "TextEdit", path: ["File"])` lists items; `path: ["File", "New"]` opens a new
          document while TextEdit stays in the background.

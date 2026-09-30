@@ -2,7 +2,7 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
-import { checkPoint, findElement, formatTree, parseCombo, parseId, permissionHelp } from './logic.ts';
+import { checkPoint, filterNodes, findElement, formatTree, parseCombo, parseId, permissionHelp } from './logic.ts';
 import * as mac from './mac.ts';
 
 const fallbackHost = process.env.TERM_PROGRAM ?? 'the app that runs Claude Code (Terminal, iTerm, Claude, …)';
@@ -45,33 +45,47 @@ async function resolve(a: { id?: string; label?: string; role?: string; app?: st
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'claude-background-control', version: '0.2.1' });
+  const server = new McpServer({ name: 'claude-background-control', version: '0.3.0' });
 
   server.registerTool('screenshot', {
-    description: 'Capture the main screen (or a region) as PNG. Image pixels equal screen points, so coordinates read off it can be passed to click as-is.',
+    description: 'Capture as PNG: the main screen, a region (x, y, w, h), or one app\'s front window (app), even if other windows cover it. Image pixels equal screen points; for a window, add the reported origin to get screen coordinates for click.',
     inputSchema: z.object({
+      app: target.app,
       x: z.number().optional(), y: z.number().optional(),
       w: z.number().positive().optional(), h: z.number().positive().optional(),
     }),
-  }, tool(async ({ x, y, w, h }) => {
+  }, tool(async ({ app, x, y, w, h }) => {
     const parts = [x, y, w, h].filter((v) => v !== undefined).length;
     if (parts !== 0 && parts !== 4) throw new Error('Pass all of x, y, w, h for a region, or none for the full screen.');
+    if (app && parts) throw new Error('Pass either app or a region, not both.');
     await need('screen');
+    if (app) {
+      const win = await mac.frontWindow(app);
+      const data = await mac.screenshot({ windowId: win.id, w: win.w });
+      let note = `Window "${win.name ?? app}" at origin (${win.x}, ${win.y}), ${win.w}x${win.h} points. Screen point = origin + image pixel.`;
+      if (win.axW && win.w < win.axW * 0.6) note += ` Warning: this is a shrunken thumbnail (Stage Manager side strip) of a ${win.axW}-point-wide window; call activate_app("${app}") first for a full-size capture.`;
+      return { content: [{ type: 'image', data, mimeType: 'image/png' }, { type: 'text', text: note }] };
+    }
     const data = await mac.screenshot(parts ? { x: x!, y: y!, w: w!, h: h! } : undefined);
     return { content: [{ type: 'image', data, mimeType: 'image/png' }] };
   }));
 
   server.registerTool('inspect', {
-    description: 'List UI elements (id, role, label, value, frame) of an app via the accessibility tree. The preferred way to find what to click.',
+    description: 'List UI elements (id, role, label, value, frame) of an app\'s windows via the accessibility tree. The preferred way to find what to click. Pass find to get only matching elements instead of the whole tree.',
     inputSchema: z.object({
       app: target.app,
+      find: z.string().optional().describe('Only elements whose role equals this or whose label/value contains it, e.g. "Save" or "AXTextField"'),
       maxDepth: z.number().int().min(0).max(30).default(10),
       maxNodes: z.number().int().min(1).max(3000).default(400),
     }),
-  }, tool(async ({ app, maxDepth, maxNodes }) => {
+  }, tool(async ({ app, find, maxDepth, maxNodes }) => {
     await need('ax');
-    const r = await mac.inspect(app, maxDepth, maxNodes);
-    return text(formatTree(r.app, r.nodes, r.truncated));
+    // With find, search the whole tree; maxNodes then caps the hits shown.
+    const r = await mac.inspect(app, maxDepth, find ? 3000 : maxNodes);
+    if (!find) return text(formatTree(r.app, r.nodes, r.truncated));
+    const hits = filterNodes(r.nodes, find);
+    if (!hits.length) return text(`App: ${r.app} — nothing matches "${find}" among ${r.nodes.length} elements.`);
+    return text(formatTree(r.app, hits.slice(0, maxNodes), hits.length > maxNodes || r.truncated));
   }));
 
   server.registerTool('click_element', {

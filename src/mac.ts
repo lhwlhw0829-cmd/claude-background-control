@@ -143,38 +143,47 @@ export const typeText = (text: string) =>
     if (typeof prev === 'string') app.setTheClipboardTo(prev);
   }`, { text });
 
-// Walks the accessibility tree, fetching each attribute for a whole sibling
-// list in one Apple Event (per-element fetches are ~100x slower).
-// Skips the menu bar's contents: menu() browses those on demand.
+// Fetches the accessibility tree one *level* at a time: an attribute read on
+// a chained specifier (windows.uiElements.uiElements…) returns that attribute
+// for every element at that depth, nested by parent, in a single Apple Event.
+// ~6 events per level instead of ~6 per parent (TextEdit: 3s -> ~0.5s).
+// ponytail: fetches whole levels even past maxNodes; very deep web views can
+// be slow — lower maxDepth for those.
 export const inspect = (app: string | undefined, maxDepth: number, maxNodes: number) =>
   jxa<{ app: string; nodes: Node[]; truncated: boolean }>(`(a) => {
     ${PROC}
-    // ponytail: role heuristic; these rarely have children worth listing and
-    // each descent costs an Apple Event (~40ms). Drop a role here if it hides targets.
-    const NO_DESCEND = new Set(['AXMenuBar', 'AXStaticText', 'AXImage', 'AXButton', 'AXScrollBar',
+    // Children of these are noise (a button's image, a text's runs).
+    const NO_DESCEND = new Set(['AXStaticText', 'AXImage', 'AXButton', 'AXScrollBar',
       'AXValueIndicator', 'AXCheckBox', 'AXRadioButton', 'AXSlider', 'AXIncrementor', 'AXTextField']);
     const out = { app: proc.name(), nodes: [], truncated: false };
-    const get = (c, p) => { try { return c[p](); } catch (e) { return []; } };
+    const get = (spec, p) => { try { return spec[p](); } catch (e) { return null; } };
     // Some values are references to other elements (object specifiers, typeof
     // 'function'); stringifying those throws -1700, so they become null.
     const str = (v) => v === null || v === undefined || v === '' || typeof v === 'function' ? null : String(v);
-    (function walk(parent, path, depth) {
-      if (depth > a.maxDepth) return;
-      const kids = parent.uiElements;
-      const roles = get(kids, 'role');
-      if (!roles.length) return; // leaf: skip the other five fetches
-      const names = get(kids, 'name'), descs = get(kids, 'description'), vals = get(kids, 'value');
-      const pos = get(kids, 'position'), size = get(kids, 'size');
+    const at = (arr, path) => path.reduce((x, i) => (x == null ? null : x[i]), arr);
+    const levels = [];
+    let spec = proc.windows; // windows only: the menu bar is menu()'s job
+    for (let d = 0; d <= a.maxDepth; d++) {
+      const role = get(spec, 'role');
+      if (!role || !JSON.stringify(role).includes('"')) break; // no elements at this depth
+      levels.push({ role, name: get(spec, 'name'), desc: get(spec, 'description'), value: get(spec, 'value'),
+        pos: get(spec, 'position'), size: get(spec, 'size') });
+      spec = spec.uiElements;
+    }
+    (function walk(path, d) {
+      const L = levels[d], roles = L && at(L.role, path);
+      if (!Array.isArray(roles)) return;
       for (let i = 0; i < roles.length; i++) {
         if (out.nodes.length >= a.maxNodes) { out.truncated = true; return; }
-        const id = path.concat(i + 1);
+        const p = path.concat(i), pos = at(L.pos, p), size = at(L.size, p);
         out.nodes.push({
-          id: id.join('.'), depth, role: roles[i], name: str(names[i]), desc: str(descs[i]),
-          value: str(vals[i]), frame: pos[i] && size[i] ? pos[i].concat(size[i]) : null,
+          id: p.map((n) => n + 1).join('.'), depth: d, role: roles[i],
+          name: str(at(L.name, p)), desc: str(at(L.desc, p)), value: str(at(L.value, p)),
+          frame: Array.isArray(pos) && Array.isArray(size) ? pos.concat(size) : null,
         });
-        if (!NO_DESCEND.has(roles[i])) walk(kids[i], id, depth + 1);
+        if (!NO_DESCEND.has(roles[i])) walk(p, d + 1);
       }
-    })(proc, [], 0);
+    })([], 0);
     return out;
   }`, { app, maxDepth, maxNodes });
 
@@ -186,8 +195,8 @@ type Hit = { role: string; name: string | null; center: [number, number] | null 
 export const actOn = (app: string | undefined, path: number[], action: 'press' | 'set_value', value?: string) =>
   jxa<Hit & { done: boolean }>(`(a) => {
     ${PROC}
-    let el = proc;
-    for (const i of a.path) el = el.uiElements[i - 1];
+    let el = proc.windows[a.path[0] - 1]; // ids start at windows, like inspect
+    for (const i of a.path.slice(1)) el = el.uiElements[i - 1];
     if (!el.exists()) throw new Error('Element ' + a.path.join('.') + ' no longer exists; call inspect again');
     const role = el.role();
     let center = null;
@@ -201,14 +210,36 @@ export const actOn = (app: string | undefined, path: number[], action: 'press' |
     return res;
   }`, { app, path, action, value });
 
+type WindowInfo = { id: number; x: number; y: number; w: number; h: number; name: string | null; axW: number | null };
+
+// The app's frontmost on-screen window: CoreGraphics id and bounds, plus the
+// accessibility width to spot Stage Manager thumbnails (CG reports the
+// shrunken thumbnail, AX the real window).
+export const frontWindow = (app: string) =>
+  jxa<WindowInfo>(`(a) => {
+    ${PROC}
+    ObjC.import('CoreGraphics');
+    const pid = proc.unixId();
+    // 1 | 16 = on-screen only, excluding desktop elements; list is front-to-back.
+    const list = ObjC.deepUnwrap(ObjC.castRefToObject($.CGWindowListCopyWindowInfo(1 | 16, 0)));
+    const w = list.find((w) => w.kCGWindowOwnerPID === pid && w.kCGWindowLayer === 0);
+    if (!w) throw new Error(a.app + ' has no visible window (minimized or hidden?). Try activate_app.');
+    let axW = null; try { axW = proc.windows[0].size()[0]; } catch (e) {}
+    const b = w.kCGWindowBounds;
+    return { id: w.kCGWindowNumber, x: b.X, y: b.Y, w: b.Width, h: b.Height, name: w.kCGWindowName || null, axW };
+  }`, { app });
+
 // Screenshot scaled so 1 image pixel = 1 screen point: coordinates read off
 // the image can go straight into click(). Also keeps Retina images small.
-export async function screenshot(region?: { x: number; y: number; w: number; h: number }): Promise<string> {
+// A window capture (-l) works even when other windows cover it.
+export async function screenshot(target?: { x: number; y: number; w: number; h: number } | { windowId: number; w: number }): Promise<string> {
   const file = join(tmpdir(), `cbc-${process.pid}-${Date.now()}.png`);
   try {
-    const where = region ? ['-R', `${region.x},${region.y},${region.w},${region.h}`] : ['-m'];
+    const where = !target ? ['-m']
+      : 'windowId' in target ? ['-o', '-l', String(target.windowId)] // -o: no shadow, so pixels map to bounds
+      : ['-R', `${target.x},${target.y},${target.w},${target.h}`];
     await sh('screencapture', ['-x', '-t', 'png', ...where, file]);
-    const width = region ? region.w : (await screenSize()).w;
+    const width = target ? target.w : (await screenSize()).w;
     await sh('sips', ['--resampleWidth', String(Math.round(width)), file]);
     return (await readFile(file)).toString('base64');
   } finally {
