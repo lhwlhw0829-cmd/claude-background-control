@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { checkPoint, findElement, formatTree, parseCombo, parseId, type Node } from './logic.ts';
+import { checkPoint, findElement, formatTree, parseCombo, parseId, permissionHelp, type Node } from './logic.ts';
 
 test('parseCombo', () => {
   assert.deepEqual(parseCombo('return'), { code: 36, mods: [] });
@@ -51,4 +51,17 @@ test('formatTree', () => {
 test('parseId', () => {
   assert.deepEqual(parseId('1.3.2'), [1, 3, 2]);
   assert.throws(() => parseId('1..2'), /Bad element id/);
+});
+
+test('permissionHelp', () => {
+  const inner = '/Users/a/Library/Application Support/Claude/claude-code/2.1.284/claude.app/Contents/MacOS/claude';
+  const msg = permissionHelp('screen', inner, 'x');
+  assert.match(msg, /^Screen Recording permission is missing\. macOS charges it to "claude":/);
+  assert.match(msg, /\n {2}\/Users\/a\/Library\/Application Support\/Claude\/claude-code\/2\.1\.284\/claude\.app\n/);
+  assert.match(msg, /Screen & System Audio Recording.*click \+, press Cmd\+Shift\+G/);
+  const term = permissionHelp('ax', '/System/Applications/Utilities/Terminal.app/Contents/MacOS/Terminal', 'x');
+  assert.match(term, /"Terminal":\n {2}\/System\/Applications\/Utilities\/Terminal\.app\n/);
+  assert.doesNotMatch(term, /Cmd\+Shift\+G/); // listed apps need no manual add
+  assert.match(permissionHelp('ax', '/usr/bin/sshd', 'x'), /"sshd":\n {2}\/usr\/bin\/sshd/);
+  assert.equal(permissionHelp('ax', null, 'iTerm'), 'Accessibility permission is missing. Open System Settings → Privacy & Security → Accessibility, enable iTerm, then restart it.');
 });

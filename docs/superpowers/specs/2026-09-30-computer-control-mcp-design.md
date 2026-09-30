@@ -179,3 +179,15 @@ Real GUI automation resists full unit testing. Split:
   the up.
 - CI (GitHub Actions, macOS) runs unit tests and the build. GUI checks
   stay manual (scripts/smoke-test.md).
+
+## v0.2.1 notes
+
+- Permission errors name the app macOS actually charges the grant to (the
+  TCC "responsible process", found with the private
+  `responsibility_get_pid_responsible_for_pid`). The Claude desktop app
+  launches Claude Code through a `disclaimer` helper, so enabling "Claude"
+  isn't enough: the grant belongs on the inner
+  `.../claude-code/<version>/claude.app`. Falls back to `TERM_PROGRAM` if
+  the call is unavailable.
+- `screenshot` verified live: a 2048-point main display gives a 2048px
+  image.

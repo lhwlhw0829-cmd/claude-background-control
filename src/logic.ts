@@ -96,3 +96,22 @@ export function parseId(id: string): number[] {
   if (!/^\d+(\.\d+)*$/.test(id)) throw new Error(`Bad element id "${id}". Use an id from inspect, e.g. "1.3.2".`);
   return id.split('.').map(Number);
 }
+
+const PANES = {
+  ax: 'Accessibility',
+  screen: 'Screen & System Audio Recording',
+};
+
+// Tells the user exactly which app to enable. `exe` is the responsible
+// executable, e.g. ".../claude.app/Contents/MacOS/claude" or "/bin/zsh".
+export function permissionHelp(kind: 'ax' | 'screen', exe: string | null, fallback: string): string {
+  const what = kind === 'ax' ? 'Accessibility' : 'Screen Recording';
+  const pane = `System Settings → Privacy & Security → ${PANES[kind]}`;
+  if (!exe) return `${what} permission is missing. Open ${pane}, enable ${fallback}, then restart it.`;
+  const app = exe.match(/^(.*?\.app)\//)?.[1] ?? exe;
+  const name = app.split('/').pop()!.replace(/\.app$/, '');
+  const hidden = !app.startsWith('/Applications/') && !app.startsWith('/System/');
+  const add = hidden ? ` If "${name}" isn't listed, click +, press Cmd+Shift+G, and paste the path above.` : '';
+  return `${what} permission is missing. macOS charges it to "${name}":\n  ${app}\n` +
+    `Open ${pane} and enable it.${add} Then fully quit and reopen the app running Claude Code.`;
+}
