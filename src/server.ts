@@ -2,14 +2,10 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio } from '@modelcontextprotocol/server/stdio';
 import * as z from 'zod/v4';
-import { checkPoint, findElement, formatTree, parseCombo, parseId } from './logic.ts';
+import { checkPoint, findElement, formatTree, parseCombo, parseId, permissionHelp } from './logic.ts';
 import * as mac from './mac.ts';
 
-const host = process.env.TERM_PROGRAM ?? 'the app that runs Claude Code (Terminal, iTerm, Claude, …)';
-const PERM_HELP = {
-  ax: `Accessibility permission is missing. Open System Settings → Privacy & Security → Accessibility, enable ${host}, then restart it.`,
-  screen: `Screen Recording permission is missing. Open System Settings → Privacy & Security → Screen & System Audio Recording, enable ${host}, then restart it.`,
-};
+const fallbackHost = process.env.TERM_PROGRAM ?? 'the app that runs Claude Code (Terminal, iTerm, Claude, …)';
 
 // Only positive results are cached: a denied permission is re-checked each
 // call so granting it takes effect without restarting the server.
@@ -17,7 +13,7 @@ const granted = { ax: false, screen: false };
 async function need(kind: 'ax' | 'screen') {
   if (granted[kind]) return;
   Object.assign(granted, await mac.permissions());
-  if (!granted[kind]) throw new Error(PERM_HELP[kind]);
+  if (!granted[kind]) throw new Error(permissionHelp(kind, await mac.responsibleExecutable(), fallbackHost));
 }
 
 type Result = { content: ({ type: 'text'; text: string } | { type: 'image'; data: string; mimeType: string })[]; isError?: boolean };
@@ -49,7 +45,7 @@ async function resolve(a: { id?: string; label?: string; role?: string; app?: st
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'claude-background-control', version: '0.2.0' });
+  const server = new McpServer({ name: 'claude-background-control', version: '0.2.1' });
 
   server.registerTool('screenshot', {
     description: 'Capture the main screen (or a region) as PNG. Image pixels equal screen points, so coordinates read off it can be passed to click as-is.',

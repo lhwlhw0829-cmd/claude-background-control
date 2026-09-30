@@ -29,7 +29,12 @@ the Claude app, …):
    Recording**: turn it on for that app. Needed for `screenshot`.
 3. Restart that app.
 
-If a permission is missing, the tool tells you exactly which one.
+If a permission is missing, the error names the exact app and path
+macOS expects. That isn't always the app you see. Claude Code inside the
+Claude desktop app, for example, needs the grant on
+`~/Library/Application Support/Claude/claude-code/<version>/claude.app`,
+which you add with **+** and Cmd+Shift+G. Because that path includes the
+version number, a Claude Code update can require granting it again.
 
 ## Tools
 

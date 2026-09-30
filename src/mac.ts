@@ -36,6 +36,23 @@ export const permissions = () =>
     return { ax: $.AXIsProcessTrusted(), screen: $.CGPreflightScreenCaptureAccess() };
   }`);
 
+// The executable macOS charges permissions to (TCC's "responsible process").
+// Often not the app the user sees: e.g. Claude.app runs Claude Code through a
+// helper that disclaims responsibility, so the inner claude.app needs the grant.
+// Uses a private libsystem call; null if it's unavailable.
+export async function responsibleExecutable(): Promise<string | null> {
+  try {
+    const pid = await jxa<number>(`() => {
+      ObjC.bindFunction('responsibility_get_pid_responsible_for_pid', ['int', ['int']]);
+      ObjC.bindFunction('getpid', ['int', []]);
+      return $.responsibility_get_pid_responsible_for_pid($.getpid());
+    }`);
+    return pid > 0 ? (await sh('ps', ['-o', 'comm=', '-p', String(pid)])).trim() || null : null;
+  } catch {
+    return null;
+  }
+}
+
 // ponytail: main display only; multi-monitor needs per-display bounds.
 export const screenSize = () =>
   jxa<{ w: number; h: number }>(`() => {
