@@ -37,13 +37,13 @@ function tool<A>(fn: (args: A) => Promise<Result>) {
 const target = {
   id: z.string().optional().describe('Element id from inspect, e.g. "1.3.2"'),
   label: z.string().optional().describe('Element name/description/value to match (used when id is not given)'),
-  role: z.string().optional().describe('Narrow a label match by role, e.g. "AXButton"'),
+  role: z.string().optional().describe('Role to match, e.g. "AXButton". Alone, it must match exactly one element.'),
   app: z.string().optional().describe('Process name, e.g. "TextEdit". Defaults to the frontmost app. Works on background apps.'),
 };
 
 async function resolve(a: { id?: string; label?: string; role?: string; app?: string }): Promise<number[]> {
   if (a.id) return parseId(a.id);
-  if (!a.label) throw new Error('Pass either id or label.');
+  if (!a.label && !a.role) throw new Error('Pass id, label, or role.');
   const { nodes } = await mac.inspect(a.app, 12, 2000); // fresh tree, so the match isn't stale
   return parseId(findElement(nodes, a.label, a.role).id);
 }

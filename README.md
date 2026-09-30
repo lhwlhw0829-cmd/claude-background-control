@@ -36,8 +36,8 @@ If a permission is missing, the tool tells you exactly which one.
 | Tool | What it does |
 |---|---|
 | `inspect(app?)` | Lists UI elements with an id, role, label, value, and frame. Start here. |
-| `click_element(id \| label, role?, app?)` | Presses a button or focuses a field via accessibility, with no mouse movement. Falls back to a real click. |
-| `set_value(id \| label, value, app?)` | Sets a text field's value directly. Works in background apps and with any language. |
+| `click_element(id \| label \| role, app?)` | Presses a button or focuses a field via accessibility, with no mouse movement. Falls back to a real click. |
+| `set_value(id \| label \| role, value, app?)` | Sets a text field's value directly. Works in background apps and with any language. |
 | `type(text)` | Types into the focused field by pasting, so Korean and other IME input comes through correctly. |
 | `key(combo)` | Sends key codes like `cmd+s` or `return`, so shortcuts work even when a Korean input source is active. |
 | `click(x, y, button?, clicks?)` | Real mouse click (CoreGraphics) for canvas or Electron content. |
@@ -45,7 +45,9 @@ If a permission is missing, the tool tells you exactly which one.
 | `activate_app(name)` | Launches an app or brings it to the front. |
 
 `app` is the process name (e.g. `"TextEdit"`). If you leave it out, the
-frontmost app is used.
+frontmost app is used. When a label or role matches in several windows,
+the frontmost window wins. If it's still ambiguous, you get a list of
+ids to choose from.
 
 ## Develop
 

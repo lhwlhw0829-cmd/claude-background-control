@@ -84,13 +84,20 @@ export const typeText = (text: string) =>
 export const inspect = (app: string | undefined, maxDepth: number, maxNodes: number) =>
   jxa<{ app: string; nodes: Node[]; truncated: boolean }>(`(a) => {
     ${PROC}
+    // ponytail: role heuristic; these rarely have children worth listing and
+    // each descent costs an Apple Event (~40ms). Drop a role here if it hides targets.
+    const NO_DESCEND = new Set(['AXMenuBar', 'AXStaticText', 'AXImage', 'AXButton', 'AXScrollBar',
+      'AXValueIndicator', 'AXCheckBox', 'AXRadioButton', 'AXSlider', 'AXIncrementor', 'AXTextField']);
     const out = { app: proc.name(), nodes: [], truncated: false };
     const get = (c, p) => { try { return c[p](); } catch (e) { return []; } };
-    const str = (v) => v === null || v === undefined || v === '' ? null : String(v);
+    // Some values are references to other elements (object specifiers, typeof
+    // 'function'); stringifying those throws -1700, so they become null.
+    const str = (v) => v === null || v === undefined || v === '' || typeof v === 'function' ? null : String(v);
     (function walk(parent, path, depth) {
       if (depth > a.maxDepth) return;
       const kids = parent.uiElements;
       const roles = get(kids, 'role');
+      if (!roles.length) return; // leaf: skip the other five fetches
       const names = get(kids, 'name'), descs = get(kids, 'description'), vals = get(kids, 'value');
       const pos = get(kids, 'position'), size = get(kids, 'size');
       for (let i = 0; i < roles.length; i++) {
@@ -100,7 +107,7 @@ export const inspect = (app: string | undefined, maxDepth: number, maxNodes: num
           id: id.join('.'), depth, role: roles[i], name: str(names[i]), desc: str(descs[i]),
           value: str(vals[i]), frame: pos[i] && size[i] ? pos[i].concat(size[i]) : null,
         });
-        if (roles[i] !== 'AXMenuBar') walk(kids[i], id, depth + 1);
+        if (!NO_DESCEND.has(roles[i])) walk(kids[i], id, depth + 1);
       }
     })(proc, [], 0);
     return out;
@@ -120,7 +127,7 @@ export const actOn = (app: string | undefined, path: number[], action: 'press' |
     const role = el.role();
     let center = null;
     try { const p = el.position(), s = el.size(); center = [p[0] + s[0] / 2, p[1] + s[1] / 2]; } catch (e) {}
-    const res = { role, name: el.name(), center, done: false };
+    const res = { role, name: el.name() || el.description(), center, done: false };
     if (a.action === 'set_value') { el.value = a.value; res.done = true; return res; }
     if (/TextField|TextArea|ComboBox|SearchField/.test(role)) {
       try { el.focused = true; res.done = true; return res; } catch (e) {}

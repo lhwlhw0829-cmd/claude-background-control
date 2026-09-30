@@ -70,16 +70,23 @@ export function formatTree(app: string, nodes: Node[], truncated: boolean): stri
 }
 
 // Match by label (name, description, or value), case-insensitive: exact
-// matches win over substring matches. More than one match is an error that
-// lists the candidates so the caller can retry with an id.
-export function findElement(nodes: Node[], label: string, role?: string): Node {
-  const want = label.toLowerCase();
+// matches win over substring matches. Matches that stay ambiguous even
+// within the frontmost window are an error listing candidate ids.
+// With no label, the role alone must pick out exactly one element.
+export function findElement(nodes: Node[], label?: string, role?: string): Node {
   const pool = role ? nodes.filter((n) => n.role.toLowerCase() === role.toLowerCase()) : nodes;
-  const labels = (n: Node) => [n.name, n.desc, n.value].filter(Boolean).map((s) => s!.toLowerCase());
-  let hits = pool.filter((n) => labels(n).includes(want));
-  if (!hits.length) hits = pool.filter((n) => labels(n).some((l) => l.includes(want)));
-  if (hits.length === 1) return hits[0];
-  const what = `label "${label}"${role ? ` and role ${role}` : ''}`;
+  let hits = pool;
+  if (label) {
+    const want = label.toLowerCase();
+    const labels = (n: Node) => [n.name, n.desc, n.value].filter(Boolean).map((s) => s!.toLowerCase());
+    hits = pool.filter((n) => labels(n).includes(want));
+    if (!hits.length) hits = pool.filter((n) => labels(n).some((l) => l.includes(want)));
+  }
+  // Same control in several windows: the first window is the frontmost one.
+  const top = (n: Node) => Number(n.id.split('.')[0]);
+  const front = hits.filter((n) => top(n) === Math.min(...hits.map(top)));
+  if (front.length === 1) return front[0];
+  const what = [label && `label "${label}"`, role && `role ${role}`].filter(Boolean).join(' and ');
   if (!hits.length) throw new Error(`No element with ${what}. Call inspect again: the UI may have changed.`);
   const list = hits.slice(0, 10).map((n) => `  [${n.id}] ${n.role} "${n.name ?? n.desc ?? n.value}"`).join('\n');
   throw new Error(`${hits.length} elements match ${what}; pass one id instead:\n${list}`);

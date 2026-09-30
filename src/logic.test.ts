@@ -36,6 +36,10 @@ test('findElement', () => {
   assert.equal(findElement(nodes, 'as…').id, '1.2'); // substring fallback
   assert.throws(() => findElement(nodes, 'Save'), /2 elements match[\s\S]*\[1\.1\][\s\S]*\[1\.4\]/);
   assert.throws(() => findElement(nodes, 'Nope'), /No element/);
+  assert.equal(findElement(nodes, undefined, 'AXTextField').id, '1.3'); // role alone
+  assert.throws(() => findElement(nodes, undefined, 'AXButton'), /2 elements match role AXButton/);
+  const twoWindows = [...nodes, node('2', 'AXWindow', 'Other'), node('2.1', 'AXButton', 'Save')];
+  assert.equal(findElement(twoWindows, 'save', 'AXButton').id, '1.1'); // frontmost window wins
 });
 
 test('formatTree', () => {
