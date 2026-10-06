@@ -50,7 +50,7 @@ async function resolve(a: { id?: string; label?: string; role?: string; app?: st
 }
 
 function createServer(): McpServer {
-  const server = new McpServer({ name: 'claude-background-control', version: '0.4.0' });
+  const server = new McpServer({ name: 'claude-background-control', version: '0.4.1' });
 
   server.registerTool('screenshot', {
     annotations: READ,
