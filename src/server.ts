@@ -37,6 +37,11 @@ const target = {
   app: z.string().optional().describe('Process name, e.g. "TextEdit". Defaults to the frontmost app. Works on background apps.'),
 };
 
+// Tool hints so hosts can warn before anything that acts on the GUI.
+// Everything stays on this Mac, so openWorldHint is always false.
+const READ = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const ACT = { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false };
+
 async function resolve(a: { id?: string; label?: string; role?: string; app?: string }): Promise<number[]> {
   if (a.id) return parseId(a.id);
   if (!a.label && !a.role) throw new Error('Pass id, label, or role.');
@@ -48,6 +53,7 @@ function createServer(): McpServer {
   const server = new McpServer({ name: 'claude-background-control', version: '0.4.0' });
 
   server.registerTool('screenshot', {
+    annotations: READ,
     description: 'Capture as PNG: the main screen, a region (x, y, w, h), or one app\'s front window (app), even if other windows cover it. Image pixels equal screen points; for a window, add the reported origin to get screen coordinates for click.',
     inputSchema: z.object({
       app: target.app,
@@ -71,6 +77,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('inspect', {
+    annotations: READ,
     description: 'List UI elements (id, role, label, value, frame) of an app\'s windows via the accessibility tree. The preferred way to find what to click. Pass find to get only matching elements instead of the whole tree.',
     inputSchema: z.object({
       app: target.app,
@@ -89,6 +96,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('click_element', {
+    annotations: ACT,
     description: 'Press a button/link or focus a text field by id or label. Uses accessibility actions (no mouse movement) and falls back to a real click at the element center.',
     inputSchema: z.object(target),
   }, tool(async (a) => {
@@ -103,6 +111,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('set_value', {
+    annotations: { ...ACT, idempotentHint: true },
     description: 'Set a text field\'s value directly through accessibility. Works in background apps and with any language, without touching the keyboard or clipboard.',
     inputSchema: z.object({ ...target, value: z.string() }),
   }, tool(async (a) => {
@@ -112,6 +121,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('click', {
+    annotations: ACT,
     description: 'Real mouse click at screen coordinates (points). Fallback for content without accessibility info.',
     inputSchema: z.object({
       x: z.number(), y: z.number(),
@@ -126,6 +136,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('scroll', {
+    annotations: { ...ACT, destructiveHint: false },
     description: 'Scroll with the mouse wheel, at (x, y) if given, else wherever the cursor is.',
     inputSchema: z.object({
       direction: z.enum(['up', 'down', 'left', 'right']),
@@ -142,6 +153,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('drag', {
+    annotations: ACT,
     description: 'Drag with the left mouse button from (x1, y1) to (x2, y2): select text, move items, resize.',
     inputSchema: z.object({ x1: z.number(), y1: z.number(), x2: z.number(), y2: z.number() }),
   }, tool(async ({ x1, y1, x2, y2 }) => {
@@ -154,6 +166,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('menu', {
+    annotations: ACT,
     description: 'Use an app\'s menu bar by item names, e.g. path ["File", "Save…"]. A path ending on a menu (or empty) lists its items; ending on an item clicks it. Works on background apps. Names are localized ("..." matches "…").',
     inputSchema: z.object({ path: z.array(z.string()).default([]), app: target.app }),
   }, tool(async ({ path, app }) => {
@@ -165,6 +178,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('type', {
+    annotations: ACT,
     description: 'Type text into the focused element of the frontmost app (via paste, so Korean and other IME text work; the clipboard, images included, is restored). Prefer set_value for plain text fields.',
     inputSchema: z.object({ text: z.string().min(1) }),
   }, tool(async (a) => {
@@ -174,6 +188,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('key', {
+    annotations: ACT,
     description: 'Press a key or combo in the frontmost app, e.g. "return", "cmd+s", "cmd+shift+t", "esc", "down". repeat presses it several times.',
     inputSchema: z.object({ combo: z.string(), repeat: z.number().int().min(1).max(50).default(1) }),
   }, tool(async ({ combo, repeat }) => {
@@ -184,6 +199,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('wait_for', {
+    annotations: READ,
     description: 'Wait until an element matching find (role or label, like inspect find) appears in the app, or disappears with gone=true. Use after actions that open dialogs, load pages, or show spinners.',
     inputSchema: z.object({
       find: z.string(),
@@ -205,6 +221,7 @@ function createServer(): McpServer {
   }));
 
   server.registerTool('activate_app', {
+    annotations: { ...ACT, destructiveHint: false, idempotentHint: true },
     description: 'Launch or bring an app to the front (needed before type/key, which go to the frontmost app).',
     inputSchema: z.object({ name: z.string().describe('App name, e.g. "TextEdit"') }),
   }, tool(async ({ name }) => {
